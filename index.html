@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>DROPSK Banking PRO</title>
+<style>
+@media (max-width: 480px) {}
+@media (max-height: auto)  
+
+body{font-family: Arial; background:#0f172a; color:white; margin:0;}
+.container{max-width:400px; margin:auto; padding:15px;}
+.card{background:linear-gradient(135deg,#22c55e,#16a34a); padding:20px; border-radius:20px; margin-top:15px; color:white; box-shadow:0 10px 20px rgba(0,0,0,0.4);}
+.actions{display:flex; justify-content:space-between; margin-top:15px;}
+.actions button{width:30%; background:#1e293b;}
+input,button,select{padding:12px; border-radius:10px; border:none; margin:8px; width:90%;}
+button{background:#22c55e; color:white; cursor:pointer;}
+.page{display:none;}
+ul{list-style:none; padding:0;}
+ul li{background:#1e293b; margin:5px 0; padding:10px; border-radius:10px; font-size:14px;}
+.topbar{display:flex; justify-content:space-between;}
+.notify{position:fixed; top:20px; right:20px; background:#22c55e; padding:10px 15px; border-radius:10px; display:none;}
+
+</style>
+</head>
+<body>
+
+<div id="notify" class="notify"></div>
+<div class="container">
+
+<!-- REGISTER -->
+<div id="register" class="page">
+<h1>DROPSK Banking</h1>
+<input id="regUser" placeholder="Username" >
+<input id="regPass" type="password" placeholder="Password (min 6 chars)">
+<input id="regPassConfirm" type="password" placeholder="Confirm Password"> <span id="toggle-password">👁️</span>
+<input id="phone" placeholder="Phone Number">
+<select id="country"><option value="">Select Country</option></select>
+<select id="state"><option value="">Select State</option></select>
+<select id="gender"><option value="">Select Gender</option><option>Male</option><option>Female</option></select>
+<select id="politics"><option value="">Are you into politics?</option><option>Yes</option><option>No</option></select>
+<select id="account purpose"><option value="">What is the purpose of opening these account</option><option>Saving account</option><option>Current account</option><option>Default account</option></select>
+<input id="Source of Income" type="text" minlength="5" placeholder="Source of Income">
+<input id="Annual income" type="text" placeholder="Annuak income">
+<button onclick="register()">Register</button>
+
+<!-- Inline Login if user exists -->
+<div id="inlineLogin" style="margin-top:30px; display:none;">
+  <h2>Already Registered? Login Here</h2>
+  <input id="inlineUser" placeholder="Phone Number">
+  <input id="inlinePass" type="password" placeholder="Password">
+  <button onclick="inlineLogin()">Login</button>
+  <p style="margin-top:10px;">
+    <a href="#" onclick="forgotPassword()" style="color:#22c55e;text-decoration:none;">Forgot Password?</a>
+  </p>
+</div>
+</div>
+
+<!-- DASHBOARD -->
+<div id="dashboard" class="page">
+<div class="topbar">
+    <h3>DROPSK Banking</h3>
+    <span id="usernameDisplay"></span>
+</div>
+<div class="card">
+    <p>Available Balance</p>
+    <h1 id="balance">$0.00</h1>
+</div>
+<div class="card" id="userInfo"></div>
+<div class="actions">
+    <button onclick="startDeposit()">Deposit</button>
+    <button onclick="withdraw()">Withdraw</button>
+    <button onclick="bonus()">Bonus</button>
+</div>
+<h3>Transactions</h3>
+<ul id="history"></ul>
+</div>
+
+</div>
+
+<script>
+
+// Data
+let balance = Number(localStorage.getItem("balance")) || 0;
+let transactions = JSON.parse(localStorage.getItem("transactions")) || [];
+let userData = JSON.parse(localStorage.getItem("userData")) || null;
+let lastDeposit = Number(localStorage.getItem("lastDeposit")) || 0;
+
+// Countries + States
+const countryData = [
+  {name:"United States", code:"US", currency:"$", states:["Alabama","Alaska","Arizona","Arkansas","California","Colorado","Connecticut","Delaware","Florida","Georgia","Hawaii","Idaho","Illinois","Indiana","Iowa","Kansas","Kentucky","Louisiana","Maine","Maryland","Massachusetts","Michigan","Minnesota","Mississippi","Missouri","Montana","Nebraska","Nevada","New Hampshire","New Jersey","New Mexico","New York","North Carolina","North Dakota","Ohio","Oklahoma","Oregon","Pennsylvania","Rhode Island","South Carolina","South Dakota","Tennessee","Texas","Utah","Vermont","Virginia","Washington","West Virginia","Wisconsin","Wyoming"]},
+  {name:"United Kingdom", code:"UK", currency:"£", states:["England","Scotland","Wales","Northern Ireland"]},
+
+];
+
+// Populate country dropdown
+const countrySelect = document.getElementById("country");
+const stateSelect = document.getElementById("state");
+countryData.forEach(c=>{
+  let opt = document.createElement("option");
+  opt.value=c.code;
+  opt.textContent=c.name;
+  countrySelect.appendChild(opt);
+});
+
+// Update states when country changes
+countrySelect.addEventListener("change", ()=>{
+  const selected = countryData.find(c=>c.code===countrySelect.value);
+  stateSelect.innerHTML = '<option value="">Select State</option>';
+  if(selected){
+    selected.states.forEach(s=>{
+      let opt = document.createElement("option");
+      opt.value = s; opt.textContent = s;
+      stateSelect.appendChild(opt);
+    });
+  }
+});
+
+// Show inline login if user already registered
+if(localStorage.getItem("userData")){
+  document.getElementById("inlineLogin").style.display = "block";
+}
+
+// Utility
+function formatMoney(x){return `${userData?userData.currency:"$"}${Number(x).toLocaleString("en-US",{minimumFractionDigits:2})}`;}
+function showPage(id){document.querySelectorAll(".page").forEach(p=>p.style.display="none"); document.getElementById(id).style.display="block";}
+function showNotification(msg){let n=document.getElementById("notify"); n.innerText=msg; n.style.display="block"; setTimeout(()=>{n.style.display="none";},3000);}
+function updateUI(){
+ document.getElementById("balance").innerText = formatMoney(balance);
+ let list=document.getElementById("history"); list.innerHTML="";
+ transactions.slice().reverse().forEach(t=>{
+   list.innerHTML+=`<li>${t.type} - ${formatMoney(t.amount)}<br>${t.status} | ${t.id}<br>${t.date}</li>`;
+ });
+ if(userData) showUserInfo(userData);
+ localStorage.setItem("balance", balance);
+ localStorage.setItem("transactions", JSON.stringify(transactions));
+}
+function generateID(){return "TX"+Math.floor(Math.random()*1000000000);}
+function addTransaction(type, amt, status, id){let date=new Date().toLocaleString(); let time=Date.now(); transactions.push({type,amount:amt,status,id,date,time}); updateUI();}
+
+// REGISTER
+function register(){
+ let u=regUser.value.trim(), p=regPass.value.trim(), pc=regPassConfirm.value.trim(), ph=phone.value.trim();
+ let st=state.value, g=gender.value, pol=politics.value, ctry=country.value;
+ if(!u||!p||!pc||!ph||!st||!g||!pol||!ctry){alert("Please fill all fields!"); return;}
+ if(p!==pc){alert("Passwords do not match! ❌"); return;}
+ if(p.length<6){alert("Password must be at least 6 characters ❌"); return;}
+ const selectedCountry = countryData.find(c=>c.code===ctry);
+ let currency = selectedCountry ? selectedCountry.currency:"$";
+ userData={username:u,password:p,phone:ph,state:st,gender:g,politics:pol,country:ctry,currency:currency};
+ localStorage.setItem("userData",JSON.stringify(userData));
+ alert("Registration successful!"); showPage("dashboard");
+
+}
+
+// INLINE LOGIN
+function inlineLogin(){
+  let phoneInput = document.getElementById("inlineUser").value.trim();
+  let passwordInput = document.getElementById("inlinePass").value.trim();
+  if(!userData){alert("No user registered!"); return;}
+  if(phoneInput === userData.phone && passwordInput === userData.password){
+      document.getElementById("usernameDisplay").innerText = userData.username;
+      updateUI();
+      showPage("dashboard");
+  } else {
+      alert("Incorrect phone number or password ❌");
+  }
+}
+
+// FORGOT PASSWORD
+function forgotPassword(){
+ if(!userData){alert("No user registered!"); return;}
+ let phoneInput=prompt("Enter your registered phone number:");
+ if(phoneInput===userData.phone){alert(`Your password is: ${userData.password}`);}
+ else{alert("Phone number not found! ❌");}
+}
+
+// SHOW USER INFO
+function showUserInfo(data){
+ document.getElementById("userInfo").innerHTML = `<p>📞 ${data.phone}</p><p>📍 ${data.state}</p><p>👤 ${data.gender}</p><p>🏛 Politics: ${data.politics}</p>`;
+}
+
+// DEPOSIT
+function startDeposit(){
+ let amt = Number(prompt("Enter deposit amount:"));
+ if(!amt || amt <= 0){ alert("Enter a valid amount ❌"); return; }
+ let id = generateID();
+ addTransaction("Deposit", amt, "Pending", id);
+ lastDeposit = amt; localStorage.setItem("lastDeposit", lastDeposit);
+ showNotification("Deposit Pending ⏳");
+ setTimeout(()=>{
+   transactions.forEach(t=>{
+     if(t.id === id && t.status === "Pending"){
+       t.status = "Success"; balance += t.amount; showNotification("Deposit Completed 💰"); updateUI();
+     }
+   });
+ }, 10800000); // 3 hours
+}
+
+// WITHDRAW
+function withdraw(){
+ let amt=Number(prompt(`Enter amount (Minimum withdrawal = 1.5× last deposit = ${userData.currency}${(lastDeposit*3).toFixed(2)})`));
+ if(isNaN(amt)){alert("Enter a valid number ❌"); return;}
+ if(amt<lastDeposit*1.5){alert(`Minimum withdrawal is 1.5× last deposit (${userData.currency}${(lastDeposit*1.5).toFixed(2)}) ❌`); return;}
+ if(amt>balance){alert("Insufficient balance ❌"); return;}
+ let id=generateID(); balance-=amt; addTransaction("Withdraw",amt,"Success",id); showNotification("Withdrawal Successful 💸");
+}
+
+// BONUS
+function bonus(){
+ if(!localStorage.getItem("bonusClaimed")){
+   if(balance<=0){alert("You must have a positive balance to claim bonus!"); return;}
+   let amt=balance*0.2; let id=generateID(); balance+=amt; addTransaction("Bonus",amt,"Success",id);
+   showNotification("Bonus Added 🎉"); localStorage.setItem("bonusClaimed","true");
+ } else alert("You have already claimed your 20% bonus! ❌");
+}
+
+// INIT
+if(userData) showPage("register"); else showPage("register");
+</script>
+
+</body>
+</html>
